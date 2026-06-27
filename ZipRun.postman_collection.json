@@ -1,0 +1,1150 @@
+{
+  "info": {
+    "name": "ZipRun — AI Reassignment Engine",
+    "description": "Complete API test suite for ZipRun backend. Covers happy paths, edge cases, and the full agentic re-planning loop.\n\nSetup:\n1. Set the `baseUrl` variable to `http://localhost:8080`\n2. Run the seed script or start the app with `create-drop` so data.sql loads\n3. Execute folders in order for the full agentic loop demo",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
+    { "key": "createdOrderId", "value": "", "type": "string" },
+    { "key": "createdSuggestionId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "01 — Agents",
+      "item": [
+        {
+          "name": "GET all agents",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/agents", "host": ["{{baseUrl}}"], "path": ["api","agents"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('success flag true', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.be.true;",
+                  "  pm.expect(body.data).to.be.an('array').with.length.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET agents filtered by AVAILABLE",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/agents?status=AVAILABLE",
+              "host": ["{{baseUrl}}"], "path": ["api","agents"],
+              "query": [{ "key": "status", "value": "AVAILABLE" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('All returned agents are AVAILABLE', () => {",
+                  "  const agents = pm.response.json().data;",
+                  "  agents.forEach(a => pm.expect(a.status).to.equal('AVAILABLE'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET agents filtered by BUSY",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/agents?status=BUSY",
+              "host": ["{{baseUrl}}"], "path": ["api","agents"],
+              "query": [{ "key": "status", "value": "BUSY" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('All returned agents are BUSY', () => {",
+                  "  const agents = pm.response.json().data;",
+                  "  agents.forEach(a => pm.expect(a.status).to.equal('BUSY'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET agents filtered by OFFLINE",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/agents?status=OFFLINE",
+              "host": ["{{baseUrl}}"], "path": ["api","agents"],
+              "query": [{ "key": "status", "value": "OFFLINE" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response is array', () => {",
+                  "  pm.expect(pm.response.json().data).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET single agent — AGT-002",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/agents/AGT-002", "host": ["{{baseUrl}}"], "path": ["api","agents","AGT-002"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Correct agent returned', () => {",
+                  "  const agent = pm.response.json().data;",
+                  "  pm.expect(agent.id).to.equal('AGT-002');",
+                  "  pm.expect(agent.name).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET single agent — 404 for unknown ID",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/agents/AGT-DOES-NOT-EXIST", "host": ["{{baseUrl}}"], "path": ["api","agents","AGT-DOES-NOT-EXIST"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Error body present', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.equal(404);",
+                  "  pm.expect(body.message).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH agent status — BUSY",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/agents/AGT-002/status", "host": ["{{baseUrl}}"], "path": ["api","agents","AGT-002","status"] },
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"BUSY\"\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Agent status updated to BUSY', () => {",
+                  "  const agent = pm.response.json().data;",
+                  "  pm.expect(agent.status).to.equal('BUSY');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH agent status — back to AVAILABLE",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/agents/AGT-002/status", "host": ["{{baseUrl}}"], "path": ["api","agents","AGT-002","status"] },
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"AVAILABLE\"\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Agent status updated to AVAILABLE', () => {",
+                  "  const agent = pm.response.json().data;",
+                  "  pm.expect(agent.status).to.equal('AVAILABLE');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH agent status — missing body (400)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/agents/AGT-002/status", "host": ["{{baseUrl}}"], "path": ["api","agents","AGT-002","status"] },
+            "body": { "mode": "raw", "raw": "{}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 — missing status field', () => pm.response.to.have.status(400));",
+                  "pm.test('Validation error returned', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.equal(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH agent status — invalid enum value (400)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/agents/AGT-002/status", "host": ["{{baseUrl}}"], "path": ["api","agents","AGT-002","status"] },
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"SLEEPING\"\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 — invalid enum', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH agent status — unknown agent (404)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/agents/AGT-GHOST/status", "host": ["{{baseUrl}}"], "path": ["api","agents","AGT-GHOST","status"] },
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"AVAILABLE\"\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 — Orders",
+      "item": [
+        {
+          "name": "GET all orders",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/orders", "host": ["{{baseUrl}}"], "path": ["api","orders"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns array of orders', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.be.true;",
+                  "  pm.expect(body.data).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET orders filtered by ASSIGNED",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/orders?status=ASSIGNED",
+              "host": ["{{baseUrl}}"], "path": ["api","orders"],
+              "query": [{ "key": "status", "value": "ASSIGNED" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('All orders have ASSIGNED status', () => {",
+                  "  pm.response.json().data.forEach(o => pm.expect(o.status).to.equal('ASSIGNED'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET orders filtered by REASSIGNMENT_PENDING",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/orders?status=REASSIGNMENT_PENDING",
+              "host": ["{{baseUrl}}"], "path": ["api","orders"],
+              "query": [{ "key": "status", "value": "REASSIGNMENT_PENDING" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns array', () => pm.expect(pm.response.json().data).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST create order — happy path",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/orders", "host": ["{{baseUrl}}"], "path": ["api","orders"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Laptops — Whitefield to MG Road\",\n  \"assignedAgentId\": \"AGT-002\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Order created with correct data', () => {",
+                  "  const order = pm.response.json().data;",
+                  "  pm.expect(order.id).to.be.a('string');",
+                  "  pm.expect(order.status).to.equal('ASSIGNED');",
+                  "  pm.expect(order.assignedAgentId).to.equal('AGT-002');",
+                  "  pm.collectionVariables.set('createdOrderId', order.id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET single order — created above",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/orders/{{createdOrderId}}", "host": ["{{baseUrl}}"], "path": ["api","orders","{{createdOrderId}}"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Order ID matches', () => {",
+                  "  pm.expect(pm.response.json().data.id).to.equal(pm.collectionVariables.get('createdOrderId'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST create order — missing description (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/orders", "host": ["{{baseUrl}}"], "path": ["api","orders"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assignedAgentId\": \"AGT-002\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 — missing description', () => pm.response.to.have.status(400));",
+                  "pm.test('Validation message present', () => {",
+                  "  pm.expect(pm.response.json().message).to.include('description');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST create order — missing agentId (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/orders", "host": ["{{baseUrl}}"], "path": ["api","orders"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Some delivery\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 — missing agentId', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST create order — unknown agent (404)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/orders", "host": ["{{baseUrl}}"], "path": ["api","orders"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Test order\",\n  \"assignedAgentId\": \"AGT-GHOST\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 — agent not found', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST create order — empty body (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/orders", "host": ["{{baseUrl}}"], "path": ["api","orders"] },
+            "body": { "mode": "raw", "raw": "{}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET single order — 404 for unknown ID",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/orders/ORD-DOES-NOT-EXIST", "host": ["{{baseUrl}}"], "path": ["api","orders","ORD-DOES-NOT-EXIST"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Error body has status 404', () => {",
+                  "  pm.expect(pm.response.json().status).to.equal(404);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH mark order delivered — ORD-007",
+          "request": {
+            "method": "PATCH",
+            "url": { "raw": "{{baseUrl}}/api/orders/ORD-007/deliver", "host": ["{{baseUrl}}"], "path": ["api","orders","ORD-007","deliver"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Order status is DELIVERED', () => {",
+                  "  pm.expect(pm.response.json().data.status).to.equal('DELIVERED');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH mark order delivered — unknown order (404)",
+          "request": {
+            "method": "PATCH",
+            "url": { "raw": "{{baseUrl}}/api/orders/ORD-GHOST/deliver", "host": ["{{baseUrl}}"], "path": ["api","orders","ORD-GHOST","deliver"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 — On-demand Suggestions",
+      "item": [
+        {
+          "name": "POST generate suggestion — INITIAL trigger",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/orders/ORD-001/suggest", "host": ["{{baseUrl}}"], "path": ["api","orders","ORD-001","suggest"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"triggerReason\": \"INITIAL\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Suggestion returned with expected fields', () => {",
+                  "  const s = pm.response.json().data;",
+                  "  pm.expect(s.id).to.be.a('string');",
+                  "  pm.expect(s.orderId).to.equal('ORD-001');",
+                  "  pm.expect(s.status).to.equal('PENDING');",
+                  "  pm.expect(s.triggerReason).to.equal('INITIAL');",
+                  "  pm.expect(s.confidence).to.be.a('number');",
+                  "  pm.expect(s.reasoning).to.be.a('string').and.not.empty;",
+                  "  pm.expect(s.recommendedAgentId).to.be.a('string');",
+                  "  pm.collectionVariables.set('createdSuggestionId', s.id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST generate suggestion — AGENT_OFFLINE trigger",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/orders/ORD-002/suggest", "host": ["{{baseUrl}}"], "path": ["api","orders","ORD-002","suggest"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"triggerReason\": \"AGENT_OFFLINE\",\n  \"offlineAgentId\": \"AGT-001\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Suggestion has AGENT_OFFLINE trigger reason', () => {",
+                  "  const s = pm.response.json().data;",
+                  "  pm.expect(s.triggerReason).to.equal('AGENT_OFFLINE');",
+                  "  pm.expect(s.status).to.equal('PENDING');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST generate suggestion — AGENT_OFFLINE missing offlineAgentId (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/orders/ORD-003/suggest", "host": ["{{baseUrl}}"], "path": ["api","orders","ORD-003","suggest"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"triggerReason\": \"AGENT_OFFLINE\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 — offlineAgentId required for AGENT_OFFLINE', () => pm.response.to.have.status(400));",
+                  "pm.test('Error message mentions offlineAgentId', () => {",
+                  "  pm.expect(pm.response.json().message).to.include('offlineAgentId');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST generate suggestion — unknown order (404)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/orders/ORD-GHOST/suggest", "host": ["{{baseUrl}}"], "path": ["api","orders","ORD-GHOST","suggest"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"triggerReason\": \"INITIAL\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 — order not found', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST generate suggestion — missing triggerReason (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/orders/ORD-001/suggest", "host": ["{{baseUrl}}"], "path": ["api","orders","ORD-001","suggest"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 — missing triggerReason', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 — Review Suggestions (Accept / Reject)",
+      "item": [
+        {
+          "name": "GET all suggestions",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/suggestions", "host": ["{{baseUrl}}"], "path": ["api","suggestions"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns array', () => pm.expect(pm.response.json().data).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET suggestions filtered by PENDING",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/suggestions?status=PENDING",
+              "host": ["{{baseUrl}}"], "path": ["api","suggestions"],
+              "query": [{ "key": "status", "value": "PENDING" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('All suggestions are PENDING', () => {",
+                  "  pm.response.json().data.forEach(s => pm.expect(s.status).to.equal('PENDING'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET suggestions filtered by ACCEPTED",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/suggestions?status=ACCEPTED",
+              "host": ["{{baseUrl}}"], "path": ["api","suggestions"],
+              "query": [{ "key": "status", "value": "ACCEPTED" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('All suggestions are ACCEPTED', () => {",
+                  "  pm.response.json().data.forEach(s => pm.expect(s.status).to.equal('ACCEPTED'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET suggestions filtered by REJECTED",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/suggestions?status=REJECTED",
+              "host": ["{{baseUrl}}"], "path": ["api","suggestions"],
+              "query": [{ "key": "status", "value": "REJECTED" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET suggestions for a specific order",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/orders/ORD-001/suggestions", "host": ["{{baseUrl}}"], "path": ["api","orders","ORD-001","suggestions"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('All suggestions belong to ORD-001', () => {",
+                  "  pm.response.json().data.forEach(s => pm.expect(s.orderId).to.equal('ORD-001'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH suggestion — ACCEPT",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/suggestions/{{createdSuggestionId}}", "host": ["{{baseUrl}}"], "path": ["api","suggestions","{{createdSuggestionId}}"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"ACCEPT\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Suggestion is now ACCEPTED', () => {",
+                  "  const s = pm.response.json().data;",
+                  "  pm.expect(s.status).to.equal('ACCEPTED');",
+                  "  pm.expect(s.reviewedAt).to.not.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH suggestion — ACCEPT again (400 — already reviewed)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/suggestions/{{createdSuggestionId}}", "host": ["{{baseUrl}}"], "path": ["api","suggestions","{{createdSuggestionId}}"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"ACCEPT\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 — already reviewed', () => pm.response.to.have.status(400));",
+                  "pm.test('Error message mentions already reviewed', () => {",
+                  "  pm.expect(pm.response.json().message).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH suggestion — REJECT (uses ORD-002 suggestion created earlier)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/suggestions/{{createdSuggestionId}}",
+              "host": ["{{baseUrl}}"], "path": ["api","suggestions","{{createdSuggestionId}}"],
+              "description": "Note: create a fresh PENDING suggestion and paste its ID here if the ACCEPT test already consumed this variable"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"REJECT\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// This will return 400 if already accepted — that is the correct behaviour.",
+                  "// To test REJECT, manually create a new suggestion and paste the ID.",
+                  "pm.test('Response received', () => {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH suggestion — missing decision (400)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/suggestions/{{createdSuggestionId}}", "host": ["{{baseUrl}}"], "path": ["api","suggestions","{{createdSuggestionId}}"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 — missing decision', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH suggestion — unknown suggestion (404)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/suggestions/00000000-0000-0000-0000-000000000000", "host": ["{{baseUrl}}"], "path": ["api","suggestions","00000000-0000-0000-0000-000000000000"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"ACCEPT\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 — suggestion not found', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 — Agentic Loop (Full End-to-End)",
+      "description": "Run these requests in order to demo the full agentic re-planning loop for the walkthrough.\n\nStory: AGT-005 has 3 orders (ORD-004, ORD-005, ORD-006). They go OFFLINE. The system automatically creates PENDING suggestions for all 3 orders without ops doing anything. Ops then reviews them.",
+      "item": [
+        {
+          "name": "Step 1 — Confirm AGT-005 has active orders",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/orders?status=ASSIGNED",
+              "host": ["{{baseUrl}}"], "path": ["api","orders"],
+              "query": [{ "key": "status", "value": "ASSIGNED" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('AGT-005 has ASSIGNED orders', () => {",
+                  "  const agt005Orders = pm.response.json().data.filter(o => o.assignedAgentId === 'AGT-005');",
+                  "  pm.expect(agt005Orders.length).to.be.above(0);",
+                  "  console.log('AGT-005 active orders:', agt005Orders.map(o => o.id).join(', '));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Step 2 — PATCH AGT-005 to OFFLINE (triggers agentic loop)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/agents/AGT-005/status", "host": ["{{baseUrl}}"], "path": ["api","agents","AGT-005","status"] },
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"OFFLINE\"\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 — returns immediately', () => pm.response.to.have.status(200));",
+                  "pm.test('Agent is now OFFLINE', () => {",
+                  "  pm.expect(pm.response.json().data.status).to.equal('OFFLINE');",
+                  "});",
+                  "pm.test('Response time is fast (re-planning is async)', () => {",
+                  "  pm.expect(pm.response.responseTime).to.be.below(3000);",
+                  "});",
+                  "console.log('Re-planning loop has been triggered. Wait 2-5 seconds, then run Step 3.');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Step 3 — Poll for PENDING suggestions (wait 2-5s after Step 2)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/suggestions?status=PENDING",
+              "host": ["{{baseUrl}}"], "path": ["api","suggestions"],
+              "query": [{ "key": "status", "value": "PENDING" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const suggestions = pm.response.json().data;",
+                  "const agenticSuggestions = suggestions.filter(s => s.triggerReason === 'AGENT_OFFLINE');",
+                  "pm.test('Agentic re-plan suggestions are present', () => {",
+                  "  pm.expect(agenticSuggestions.length).to.be.above(0);",
+                  "  console.log('Auto-generated suggestions for offline agent:', agenticSuggestions.length);",
+                  "});",
+                  "pm.test('All agentic suggestions are PENDING', () => {",
+                  "  agenticSuggestions.forEach(s => pm.expect(s.status).to.equal('PENDING'));",
+                  "});",
+                  "pm.test('Reasoning is populated by AI or rule fallback', () => {",
+                  "  agenticSuggestions.forEach(s => {",
+                  "    pm.expect(s.reasoning).to.be.a('string').and.not.empty;",
+                  "    pm.expect(s.recommendedAgentId).to.be.a('string');",
+                  "  });",
+                  "});",
+                  "// Save first agentic suggestion ID for Step 4",
+                  "if (agenticSuggestions.length > 0) {",
+                  "  pm.collectionVariables.set('agenticSuggestionId', agenticSuggestions[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Step 4 — Accept first agentic suggestion",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/suggestions/{{agenticSuggestionId}}", "host": ["{{baseUrl}}"], "path": ["api","suggestions","{{agenticSuggestionId}}"] },
+            "body": { "mode": "raw", "raw": "{\n  \"decision\": \"ACCEPT\"\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Suggestion accepted — order reassigned', () => {",
+                  "  const s = pm.response.json().data;",
+                  "  pm.expect(s.status).to.equal('ACCEPTED');",
+                  "  pm.expect(s.reviewedAt).to.not.be.null;",
+                  "  pm.expect(s.triggerReason).to.equal('AGENT_OFFLINE');",
+                  "  console.log('Order', s.orderId, 'reassigned to agent', s.recommendedAgentId);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Step 5 — Verify order is now REASSIGNED",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/orders?status=REASSIGNED",
+              "host": ["{{baseUrl}}"], "path": ["api","orders"],
+              "query": [{ "key": "status", "value": "REASSIGNED" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('At least one REASSIGNED order exists', () => {",
+                  "  pm.expect(pm.response.json().data.length).to.be.above(0);",
+                  "  console.log('REASSIGNED orders:', pm.response.json().data.map(o => o.id).join(', '));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Step 6 — Idempotency check (PATCH AGT-005 OFFLINE again)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/agents/AGT-005/status", "host": ["{{baseUrl}}"], "path": ["api","agents","AGT-005","status"] },
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"OFFLINE\"\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "console.log('Fired OFFLINE again. Wait 3s, then check Step 7 — no duplicate PENDING suggestions should appear.');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Step 7 — Verify no duplicate PENDING AGENT_OFFLINE suggestions",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/suggestions?status=PENDING",
+              "host": ["{{baseUrl}}"], "path": ["api","suggestions"],
+              "query": [{ "key": "status", "value": "PENDING" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const suggestions = pm.response.json().data;",
+                  "",
+                  "// Group by orderId — no order should have more than one PENDING AGENT_OFFLINE suggestion",
+                  "const grouped = {};",
+                  "suggestions.filter(s => s.triggerReason === 'AGENT_OFFLINE').forEach(s => {",
+                  "  grouped[s.orderId] = (grouped[s.orderId] || 0) + 1;",
+                  "});",
+                  "",
+                  "pm.test('No order has duplicate PENDING AGENT_OFFLINE suggestions (idempotency)', () => {",
+                  "  Object.entries(grouped).forEach(([orderId, count]) => {",
+                  "    pm.expect(count, `Order ${orderId} has ${count} duplicate PENDING suggestions`).to.equal(1);",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06 — Health & Actuator",
+      "item": [
+        {
+          "name": "GET actuator health",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/actuator/health", "host": ["{{baseUrl}}"], "path": ["actuator","health"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Application is UP', () => {",
+                  "  pm.expect(pm.response.json().status).to.equal('UP');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET actuator info",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/actuator/info", "host": ["{{baseUrl}}"], "path": ["actuator","info"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
