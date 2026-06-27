@@ -1,28 +1,39 @@
 package com.zycus.ziprun.config;
 
 import org.flywaydb.core.Flyway;
-import org.springframework.boot.autoconfigure.flyway.FlywayMigrationStrategy;
+import org.springframework.boot.autoconfigure.flyway.FlywayProperties;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import jakarta.persistence.EntityManagerFactory;
+import javax.sql.DataSource;
+
 /**
- * Customises Flyway startup so it runs AFTER Hibernate has finished
- * creating the schema via ddl-auto=create-drop.
+ * Breaks the circular dependency between Flyway and entityManagerFactory.
  *
- * Without this, Flyway and Hibernate race each other on startup —
- * Flyway tries to insert seed data before the tables exist.
+ * Spring Boot's FlywayAutoConfiguration makes JPA depend on Flyway
+ * (so Flyway runs before Hibernate). But we need the opposite — Hibernate
+ * creates the schema first (create-drop), then Flyway seeds data.
  *
- * The FlywayMigrationStrategy bean gives us full control over when
- * Flyway.migrate() is called. Spring Boot calls this strategy bean
- * instead of running Flyway automatically during datasource init.
- * By the time this bean method executes, the JPA EntityManagerFactory
- * is already initialised, meaning Hibernate has already run DDL.
+ * Solution: disable FlywayAutoConfiguration, define our own Flyway bean
+ * that explicitly depends on EntityManagerFactory. Spring will then
+ * initialise JPA first, then our Flyway bean, then call migrate().
  */
 @Configuration
+@EnableConfigurationProperties(FlywayProperties.class)
 public class FlywayConfig {
 
-    @Bean
-    public FlywayMigrationStrategy flywayMigrationStrategy() {
-        return Flyway::migrate;
+    @Bean(initMethod = "migrate")
+    public Flyway flyway(DataSource dataSource, EntityManagerFactory entityManagerFactory) {
+        // EntityManagerFactory parameter forces Spring to initialise JPA first.
+        // Hibernate runs create-drop DDL during EMF initialisation,
+        // so by the time this bean is created the tables already exist.
+        return Flyway.configure()
+                .dataSource(dataSource)
+                .locations("classpath:db/migration")
+                .baselineOnMigrate(true)
+                .baselineVersion("0")
+                .load();
     }
 }
